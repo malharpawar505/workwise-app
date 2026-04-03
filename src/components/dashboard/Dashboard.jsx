@@ -211,7 +211,11 @@ export default function Dashboard() {
       </div>
 
       {/* Monthly Summary Cards */}
-      {s && (
+      {s && (() => {
+        const recs = monthly?.records || [];
+        const dailyExtra = recs.reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
+        const monthRemaining = Math.max(0, s.totalRequiredHours - s.totalWorkedHours);
+        return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SummaryCard
             icon={<Clock size={20} />}
@@ -228,21 +232,22 @@ export default function Dashboard() {
             color="emerald"
           />
           <SummaryCard
-            icon={s.remaining > 0 ? <TrendingDown size={20} /> : <TrendingUp size={20} />}
-            label={s.extra > 0 ? 'Extra' : 'Remaining'}
-            value={hoursToHM(s.extra > 0 ? s.extra : Math.max(0, s.totalRequiredHours - s.totalWorkedHours))}
-            sub={s.extra > 0 ? 'overtime this month' : `of ${s.totalRequiredHours}h monthly target`}
-            color={s.extra > 0 ? 'emerald' : 'amber'}
+            icon={<TrendingDown size={20} />}
+            label="Remaining"
+            value={hoursToHM(monthRemaining)}
+            sub={`of ${s.totalRequiredHours}h monthly target`}
+            color="amber"
           />
           <SummaryCard
-            icon={<AlertCircle size={20} />}
-            label="Deficit Days"
-            value={s.daysWithDeficit}
-            sub={`${s.daysAbsent} absent`}
-            color="red"
+            icon={<TrendingUp size={20} />}
+            label="Extra"
+            value={hoursToHM(dailyExtra)}
+            sub="daily overtime total"
+            color={dailyExtra > 0 ? 'emerald' : 'red'}
           />
         </div>
-      )}
+        );
+      })()}
 
       {/* Progress Bar */}
       {s && (
