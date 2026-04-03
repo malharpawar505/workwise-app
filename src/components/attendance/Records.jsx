@@ -178,9 +178,9 @@ export default function Records() {
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <MiniStat label="Worked" value={hoursToHM(summary.totalWorkedHours)} />
-          <MiniStat label="Required" value={`${summary.requiredTillToday}h`} />
-          <MiniStat label="Remaining" value={hoursToHM(summary.remaining)} />
-          <MiniStat label="Extra" value={hoursToHM(summary.extra)} />
+          <MiniStat label="Required" value={`${summary.totalRequiredHours}h`} />
+          <MiniStat label="Remaining" value={hoursToHM(Math.max(0, summary.totalRequiredHours - summary.totalWorkedHours))} />
+          <MiniStat label="Extra" value={hoursToHM(Math.max(0, summary.totalWorkedHours - summary.totalRequiredHours))} />
         </div>
       )}
 
