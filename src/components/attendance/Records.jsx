@@ -107,6 +107,10 @@ export default function Records() {
     }
   };
 
+  // Calculate sum of daily overtime hours
+  const dailyExtra = records.reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
+  const monthlyRemaining = summary ? Math.max(0, summary.totalRequiredHours - summary.totalWorkedHours) : 0;
+
   return (
     <div className="space-y-6 animate-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -179,8 +183,8 @@ export default function Records() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <MiniStat label="Worked" value={hoursToHM(summary.totalWorkedHours)} />
           <MiniStat label="Required" value={`${summary.totalRequiredHours}h`} />
-          <MiniStat label="Remaining" value={hoursToHM(Math.max(0, summary.totalRequiredHours - summary.totalWorkedHours))} />
-          <MiniStat label="Extra" value={hoursToHM(Math.max(0, summary.totalWorkedHours - summary.totalRequiredHours))} />
+          <MiniStat label="Remaining" value={hoursToHM(monthlyRemaining)} />
+          <MiniStat label="Extra" value={hoursToHM(dailyExtra)} />
         </div>
       )}
 

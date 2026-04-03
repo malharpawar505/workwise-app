@@ -126,6 +126,10 @@ export default function Dashboard() {
 
   const progressPct = s ? Math.min(100, Math.round((s.totalWorkedHours / Math.max(1, s.totalRequiredHours)) * 100)) : 0;
 
+  // Calculate sum of daily overtime
+  const dailyExtra = (monthly?.records || []).reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
+  const monthRemaining = s ? Math.max(0, s.totalRequiredHours - s.totalWorkedHours) : 0;
+
   return (
     <div className="space-y-6 animate-in">
       {/* Greeting */}
@@ -211,11 +215,7 @@ export default function Dashboard() {
       </div>
 
       {/* Monthly Summary Cards */}
-      {s && (() => {
-        const recs = monthly?.records || [];
-        const dailyExtra = recs.reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
-        const monthRemaining = Math.max(0, s.totalRequiredHours - s.totalWorkedHours);
-        return (
+      {s && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SummaryCard
             icon={<Clock size={20} />}
@@ -246,8 +246,7 @@ export default function Dashboard() {
             color={dailyExtra > 0 ? 'emerald' : 'red'}
           />
         </div>
-        );
-      })()}
+      )}
 
       {/* Progress Bar */}
       {s && (
