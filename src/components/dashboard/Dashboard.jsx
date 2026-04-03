@@ -124,7 +124,7 @@ export default function Dashboard() {
     status: r.status
   }));
 
-  const progressPct = s ? Math.min(100, Math.round((s.totalWorkedHours / Math.max(1, s.requiredTillToday)) * 100)) : 0;
+  const progressPct = s ? Math.min(100, Math.round((s.totalWorkedHours / Math.max(1, s.totalRequiredHours)) * 100)) : 0;
 
   return (
     <div className="space-y-6 animate-in">
@@ -217,21 +217,21 @@ export default function Dashboard() {
             icon={<Clock size={20} />}
             label="Worked"
             value={hoursToHM(s.totalWorkedHours)}
-            sub={`of ${s.requiredTillToday}h required`}
+            sub={`of ${s.totalRequiredHours}h monthly target`}
             color="brand"
           />
           <SummaryCard
             icon={<CalendarDays size={20} />}
             label="Present"
             value={`${s.daysPresent} days`}
-            sub={`of ${s.workingDaysTillToday} working days`}
+            sub={`of ${s.totalWorkingDays} working days`}
             color="emerald"
           />
           <SummaryCard
             icon={s.remaining > 0 ? <TrendingDown size={20} /> : <TrendingUp size={20} />}
             label={s.extra > 0 ? 'Extra' : 'Remaining'}
-            value={hoursToHM(s.extra > 0 ? s.extra : s.remaining)}
-            sub={s.extra > 0 ? 'overtime this month' : 'to meet target'}
+            value={hoursToHM(s.extra > 0 ? s.extra : Math.max(0, s.totalRequiredHours - s.totalWorkedHours))}
+            sub={s.extra > 0 ? 'overtime this month' : `of ${s.totalRequiredHours}h monthly target`}
             color={s.extra > 0 ? 'emerald' : 'amber'}
           />
           <SummaryCard
@@ -261,7 +261,7 @@ export default function Dashboard() {
           </div>
           <div className="flex justify-between text-xs text-surface-300 mt-1">
             <span>{hoursToHM(s.totalWorkedHours)}</span>
-            <span>{s.requiredTillToday}h target</span>
+            <span>{s.totalRequiredHours}h monthly target</span>
           </div>
         </div>
       )}

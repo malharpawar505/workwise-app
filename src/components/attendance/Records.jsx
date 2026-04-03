@@ -3,7 +3,7 @@ import api from '../../utils/api';
 import { formatTime, formatDate, getDayName, hoursToHM, statusColor, MONTHS, isWeekend } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import {
-  ChevronLeft, ChevronRight, Download, Pencil, X, Save, Filter
+  ChevronLeft, ChevronRight, Download, Pencil, X, Save, Filter, Plus
 } from 'lucide-react';
 
 export default function Records() {
@@ -14,6 +14,7 @@ export default function Records() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editRecord, setEditRecord] = useState(null);
+  const [addEntry, setAddEntry] = useState(null);
   const [filterMode, setFilterMode] = useState('month'); // 'month' | 'range'
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -88,6 +89,24 @@ export default function Records() {
     }
   };
 
+  const handleAddEntry = async () => {
+    if (!addEntry?.date || !addEntry?.login_time || !addEntry?.logout_time) {
+      return toast.error('Fill in all fields.');
+    }
+    try {
+      await api.post('/attendance/manual', {
+        date: addEntry.date,
+        login_time: new Date(`${addEntry.date}T${addEntry.login_time}`).toISOString(),
+        logout_time: new Date(`${addEntry.date}T${addEntry.logout_time}`).toISOString()
+      });
+      toast.success('Entry added!');
+      setAddEntry(null);
+      fetchMonthly();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add entry.');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -126,10 +145,16 @@ export default function Records() {
             <span className="text-lg font-bold min-w-[160px] text-center">{MONTHS[month - 1]} {year}</span>
             <button onClick={nextMonth} className="btn-secondary p-2"><ChevronRight size={18} /></button>
           </div>
-          <button onClick={exportExcel} className="btn-secondary flex items-center gap-2 text-sm">
-            <Download size={16} />
-            <span className="hidden sm:inline">Export Excel</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setAddEntry({ date: '', login_time: '09:30', logout_time: '18:30' })} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus size={16} />
+              <span className="hidden sm:inline">Add Entry</span>
+            </button>
+            <button onClick={exportExcel} className="btn-secondary flex items-center gap-2 text-sm">
+              <Download size={16} />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="card p-4">
@@ -227,6 +252,53 @@ export default function Records() {
           onSave={handleSaveEdit}
           onChange={setEditRecord}
         />
+      )}
+
+      {/* Add Entry Modal */}
+      {addEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setAddEntry(null)}>
+          <div className="card p-6 w-full max-w-md animate-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Add Past Entry</h3>
+              <button onClick={() => setAddEntry(null)} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-surface-300 mb-1">Date</label>
+                <input
+                  type="date"
+                  className="input-field text-sm"
+                  max={new Date().toISOString().split('T')[0]}
+                  value={addEntry.date}
+                  onChange={e => setAddEntry({ ...addEntry, date: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-300 mb-1">Login Time</label>
+                <input
+                  type="time"
+                  className="input-field text-sm"
+                  value={addEntry.login_time}
+                  onChange={e => setAddEntry({ ...addEntry, login_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-300 mb-1">Logout Time</label>
+                <input
+                  type="time"
+                  className="input-field text-sm"
+                  value={addEntry.logout_time}
+                  onChange={e => setAddEntry({ ...addEntry, logout_time: e.target.value })}
+                />
+              </div>
+              <button onClick={handleAddEntry} className="btn-primary w-full flex items-center justify-center gap-2">
+                <Plus size={16} /> Add Entry
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
