@@ -149,10 +149,9 @@ export default function Dashboard() {
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Timer size={20} className="text-brand-600" />
               Today's Status
+              {isWeekend && <span className="text-xs font-normal text-surface-300 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded-lg ml-2">Weekend</span>}
             </h2>
-            {isWeekend ? (
-              <p className="text-surface-300 mt-1">It's the weekend — enjoy your day off!</p>
-            ) : isPunchedIn ? (
+            {isPunchedIn ? (
               <div className="mt-2">
                 <p className="text-sm text-surface-300">Currently working</p>
                 <p className="text-4xl font-bold font-mono text-brand-600 mt-1">{hoursToHM(liveHours)}</p>
@@ -171,31 +170,31 @@ export default function Dashboard() {
                 <span className={`status-badge mt-2 ${statusColor(rec.status)}`}>{rec.status}</span>
               </div>
             ) : (
-              <p className="text-surface-300 mt-1">You haven't punched in yet today.</p>
+              <p className="text-surface-300 mt-1">
+                {isWeekend ? "It's the weekend — but you can still log overtime!" : "You haven't punched in yet today."}
+              </p>
             )}
           </div>
 
-          {/* Punch buttons */}
-          {!isWeekend && (
-            <div className="flex gap-3 w-full sm:w-auto">
-              {!rec ? (
-                <button onClick={punchIn} disabled={punching} className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2">
-                  <LogIn size={18} />
-                  Punch In
-                </button>
-              ) : isPunchedIn ? (
-                <button onClick={punchOut} disabled={punching} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 py-3 transition-all">
-                  <LogOut size={18} />
-                  Punch Out
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 size={20} />
-                  <span className="text-sm font-medium">Completed for today</span>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Punch buttons — always available */}
+          <div className="flex gap-3 w-full sm:w-auto">
+            {!rec ? (
+              <button onClick={punchIn} disabled={punching} className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2">
+                <LogIn size={18} />
+                Punch In
+              </button>
+            ) : isPunchedIn ? (
+              <button onClick={punchOut} disabled={punching} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 py-3 transition-all">
+                <LogOut size={18} />
+                Punch Out
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 size={20} />
+                <span className="text-sm font-medium">Completed for today</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
