@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import {
-  Clock, LayoutDashboard, Table2, Sun, Moon, LogOut, Menu, X
+  Clock, LayoutDashboard, Table2, Sun, Moon, LogOut, Menu, X, Heart
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -134,6 +134,18 @@ export default function AppShell() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         <Outlet />
       </main>
+
+      {/* Signature */}
+      <footer className="py-4 px-4 border-t border-surface-200/50 dark:border-surface-800/50">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs text-surface-300">
+          <span className="flex items-center gap-1.5">
+            Crafted with <Heart size={12} className="text-red-400 fill-red-400 animate-pulse-slow" /> by
+            <span className="font-semibold text-brand-600 dark:text-brand-400">Malhar</span>
+          </span>
+          <span className="hidden sm:inline">·</span>
+          <span className="opacity-70">making life easy to live</span>
+        </div>
+      </footer>
     </div>
   );
 }

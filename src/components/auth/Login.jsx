@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Clock, Eye, EyeOff } from 'lucide-react';
+import { Clock, Eye, EyeOff, Heart } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
@@ -96,6 +96,12 @@ export default function Login() {
 
         <p className="text-center text-xs text-surface-300 mt-6">
           Demo: demo@workwise.app / demo1234
+        </p>
+
+        <p className="text-center text-xs text-surface-300 mt-8 flex items-center justify-center gap-1.5">
+          Crafted with <Heart size={11} className="text-red-400 fill-red-400 animate-pulse-slow" /> by
+          <span className="font-semibold text-brand-600 dark:text-brand-400">Malhar</span>
+          <span className="opacity-60">· making life easy to live</span>
         </p>
       </div>
     </div>

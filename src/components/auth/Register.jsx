@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Clock, Eye, EyeOff } from 'lucide-react';
+import { Clock, Eye, EyeOff, Heart } from 'lucide-react';
 
 export default function Register() {
   const { register } = useAuth();
@@ -78,6 +78,12 @@ export default function Register() {
             <Link to="/login" className="text-brand-600 hover:text-brand-700 font-semibold">Sign in</Link>
           </p>
         </div>
+
+        <p className="text-center text-xs text-surface-300 mt-8 flex items-center justify-center gap-1.5">
+          Crafted with <Heart size={11} className="text-red-400 fill-red-400 animate-pulse-slow" /> by
+          <span className="font-semibold text-brand-600 dark:text-brand-400">Malhar</span>
+          <span className="opacity-60">· making life easy to live</span>
+        </p>
       </div>
     </div>
   );
