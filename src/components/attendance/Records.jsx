@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { formatTime, formatDate, getDayName, hoursToHM, statusColor, MONTHS, isWeekend } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import {
@@ -7,6 +8,9 @@ import {
 } from 'lucide-react';
 
 export default function Records() {
+  const { user } = useAuth();
+  const monthlySalary = user?.monthly_salary || 0;
+  
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -110,6 +114,8 @@ export default function Records() {
   // Calculate sum of daily overtime hours
   const dailyExtra = records.reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
   const monthlyRemaining = summary ? Math.max(0, summary.totalRequiredHours - summary.totalWorkedHours) : 0;
+  
+  const hourlyRate = monthlySalary > 0 ? (monthlySalary / (summary?.totalRequiredHours || 189)) : 0;
 
   return (
     <div className="space-y-6 animate-in">
@@ -210,6 +216,7 @@ export default function Records() {
                   <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300">Out</th>
                   <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300">Hours</th>
                   <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300 hidden sm:table-cell">Diff</th>
+                  <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300">Earned</th>
                   <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300">Status</th>
                   <th className="text-center py-3 px-4 font-semibold text-xs uppercase tracking-wider text-surface-300 w-12"></th>
                 </tr>
@@ -217,6 +224,9 @@ export default function Records() {
               <tbody>
                 {records.map((r) => {
                   const diff = (r.total_hours || 0) - 9;
+                  const earned = r.total_hours ? Math.round(r.total_hours * hourlyRate) : 0;
+                  const formattedEarned = earned > 0 && monthlySalary > 0 ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(earned) : '—';
+                  
                   return (
                     <tr key={r.id} className="border-b border-surface-100 dark:border-surface-800/50 hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-colors">
                       <td className="py-3 px-4 font-medium">{formatDate(r.date)}</td>
@@ -226,6 +236,9 @@ export default function Records() {
                       <td className="py-3 px-4 font-semibold">{r.total_hours ? `${r.total_hours}h` : '—'}</td>
                       <td className={`py-3 px-4 font-mono text-xs hidden sm:table-cell ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                         {r.total_hours ? `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}h` : '—'}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-brand-600 dark:text-brand-400">
+                        {formattedEarned}
                       </td>
                       <td className="py-3 px-4">
                         <span className={`status-badge ${statusColor(r.status)}`}>{r.status}</span>
