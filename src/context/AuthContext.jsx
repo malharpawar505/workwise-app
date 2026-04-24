@@ -40,8 +40,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const updateProfile = useCallback(async (updates) => {
+    const { data } = await api.put('/auth/profile', updates);
+    localStorage.setItem('ww_user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

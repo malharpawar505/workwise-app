@@ -5,14 +5,15 @@ import { hoursToHM, statusColor, MONTHS } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import {
   LogIn, LogOut, Clock, CalendarDays, TrendingUp, TrendingDown,
-  AlertCircle, CheckCircle2, Timer, ChevronLeft, ChevronRight, Download
+  AlertCircle, CheckCircle2, Timer, ChevronLeft, ChevronRight, Download,
+  Banknote, Pencil, X, Save
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [today, setToday] = useState(null);
   const [monthly, setMonthly] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,32 @@ export default function Dashboard() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const monthlySalary = user?.monthly_salary || 0;
+  const [showSalaryTutorial, setShowSalaryTutorial] = useState(false);
+  const [salaryInput, setSalaryInput] = useState('');
+  const [isSavingSalary, setIsSavingSalary] = useState(false);
+
+  useEffect(() => {
+    if (!loading && monthly?.summary && monthlySalary === 0) {
+      const timer = setTimeout(() => setShowSalaryTutorial(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, monthly, monthlySalary]);
+
+  const handleSaveSalary = async () => {
+    if (!salaryInput || isNaN(salaryInput)) return toast.error('Enter a valid amount');
+    setIsSavingSalary(true);
+    try {
+      await updateProfile({ monthly_salary: parseFloat(salaryInput) });
+      toast.success('Salary updated!');
+      setShowSalaryTutorial(false);
+    } catch (err) {
+      toast.error('Failed to update salary.');
+    } finally {
+      setIsSavingSalary(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -138,6 +165,12 @@ export default function Dashboard() {
   const monthRemaining = s ? Math.max(0, s.totalRequiredHours - s.totalWorkedHours) : 0;
   const overallDiff = s ? (s.totalWorkedHours - s.requiredTillToday) : 0;
 
+  // Salary Calculation
+  const hourlyRate = s && s.totalRequiredHours > 0 ? (monthlySalary / s.totalRequiredHours) : 0;
+  const earnedSalary = Math.round(s ? (s.totalWorkedHours * hourlyRate) : 0);
+  const formattedEarned = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(earnedSalary);
+  const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(monthlySalary);
+
   return (
     <div className="space-y-6 animate-in">
       {/* Greeting */}
@@ -223,7 +256,14 @@ export default function Dashboard() {
 
       {/* Monthly Summary Cards */}
       {s && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+          <SalaryCard
+            icon={<Banknote size={20} />}
+            label="Earned"
+            value={formattedEarned}
+            sub={`of ${formattedTotal} monthly`}
+            onEdit={() => { setSalaryInput(monthlySalary || ''); setShowSalaryTutorial(true); }}
+          />
           <SummaryCard
             icon={<Clock size={20} />}
             label="Worked"
@@ -329,6 +369,57 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Salary Tutorial Modal */}
+      {showSalaryTutorial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => monthlySalary > 0 && setShowSalaryTutorial(false)}>
+          <div className="card p-6 w-full max-w-md animate-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Banknote size={20} className="text-emerald-600" /> 
+                {monthlySalary === 0 ? 'Salary Setup' : 'Update Salary'}
+              </h3>
+              {monthlySalary > 0 && (
+                <button onClick={() => setShowSalaryTutorial(false)} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            
+            {monthlySalary === 0 && (
+              <div className="bg-brand-50 dark:bg-brand-900/30 p-4 rounded-xl mb-5">
+                <p className="text-sm text-brand-700 dark:text-brand-300">
+                  <strong>Welcome to Earnings Tracking!</strong><br/><br/>
+                  Enter your fixed monthly salary below. We'll automatically calculate your exact earned amount in real-time as your work hours tick up. 
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-surface-300 mb-1">Monthly Salary (INR)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3 text-surface-400">₹</span>
+                  <input
+                    type="number"
+                    className="input-field text-sm pl-8"
+                    placeholder="e.g. 39000"
+                    value={salaryInput}
+                    onChange={e => setSalaryInput(e.target.value)}
+                  />
+                </div>
+              </div>
+              <button 
+                onClick={handleSaveSalary} 
+                disabled={isSavingSalary}
+                className="btn-primary w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 focus:ring-emerald-500 hover:shadow-emerald-500/25"
+              >
+                <Save size={16} /> {isSavingSalary ? 'Saving...' : 'Save & Calculate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -348,6 +439,26 @@ function SummaryCard({ icon, label, value, sub, color }) {
       </div>
       <p className="text-xs font-medium text-surface-300 uppercase tracking-wider">{label}</p>
       <p className="text-xl sm:text-2xl font-bold mt-0.5">{value}</p>
+      <p className="text-xs text-surface-300 mt-0.5">{sub}</p>
+    </div>
+  );
+}
+
+function SalaryCard({ icon, label, value, sub, onEdit }) {
+  return (
+    <div className="card card-hover p-4 sm:p-5 relative group border-emerald-200 dark:border-emerald-900/50">
+      <button 
+        onClick={onEdit} 
+        className="absolute top-3 right-3 p-1.5 rounded-lg text-surface-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 opacity-0 group-hover:opacity-100 transition-all"
+        title="Edit Salary"
+      >
+        <Pencil size={14} />
+      </button>
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
+        {icon}
+      </div>
+      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{label}</p>
+      <p className="text-xl sm:text-2xl font-bold mt-0.5 text-emerald-700 dark:text-emerald-300">{value}</p>
       <p className="text-xs text-surface-300 mt-0.5">{sub}</p>
     </div>
   );
