@@ -161,7 +161,7 @@ export default function Records() {
           </div>
         </div>
       ) : (
-        <div className="card p-4">
+        <div className="card card-hover p-4">
           <div className="flex flex-col sm:flex-row items-end gap-3">
             <div className="flex-1 w-full">
               <label className="block text-xs font-medium text-surface-300 mb-1">From</label>
@@ -310,7 +310,7 @@ export default function Records() {
 
 function MiniStat({ label, value }) {
   return (
-    <div className="card p-3">
+    <div className="card card-hover p-3">
       <p className="text-xs text-surface-300 font-medium">{label}</p>
       <p className="text-lg font-bold mt-0.5">{value}</p>
     </div>

@@ -151,7 +151,7 @@ export default function Dashboard() {
       </div>
 
       {/* Punch Card */}
-      <div className="card p-6">
+      <div className="card card-hover p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -271,7 +271,7 @@ export default function Dashboard() {
 
       {/* Progress Bar */}
       {s && (
-        <div className="card p-5">
+        <div className="card card-hover p-5 group">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-surface-300">Monthly Progress</span>
             <span className="text-sm font-bold">{progressPct}%</span>
@@ -293,7 +293,7 @@ export default function Dashboard() {
 
       {/* Daily Hours Chart */}
       {chartData.length > 0 && (
-        <div className="card p-5">
+        <div className="card card-hover p-5">
           <h3 className="text-sm font-bold mb-4 text-surface-300 uppercase tracking-wider">Daily Hours</h3>
           <div className="h-48 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -342,7 +342,7 @@ function SummaryCard({ icon, label, value, sub, color }) {
   };
 
   return (
-    <div className="card p-4 sm:p-5">
+    <div className="card card-hover p-4 sm:p-5">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color]}`}>
         {icon}
       </div>
