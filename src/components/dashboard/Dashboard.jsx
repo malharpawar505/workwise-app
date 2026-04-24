@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {/* Monthly Summary Cards */}
       {s && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <SalaryCard
             icon={<Banknote size={20} />}
             label="Earned"
@@ -287,24 +287,10 @@ export default function Dashboard() {
           />
           <SummaryCard
             icon={overallDiff >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-            label="Overall Diff"
+            label="Time Balance"
             value={(overallDiff > 0 ? '+' : overallDiff < 0 ? '-' : '') + hoursToHM(Math.abs(overallDiff))}
-            sub={`${overallDiff >= 0 ? 'Surplus' : 'Deficit'} till today`}
+            sub={`${overallDiff >= 0 ? 'Ahead of schedule' : 'Behind schedule'}`}
             color={overallDiff >= 0 ? 'emerald' : 'red'}
-          />
-          <SummaryCard
-            icon={<AlertCircle size={20} />}
-            label="Less Worked"
-            value={hoursToHM(dailyDeficit)}
-            sub={`${s.daysWithDeficit} day${s.daysWithDeficit !== 1 ? 's' : ''} under 9h`}
-            color={dailyDeficit > 0 ? 'red' : 'emerald'}
-          />
-          <SummaryCard
-            icon={<TrendingUp size={20} />}
-            label="Extra"
-            value={hoursToHM(dailyExtra)}
-            sub="daily overtime total"
-            color={dailyExtra > 0 ? 'emerald' : 'red'}
           />
         </div>
       )}
