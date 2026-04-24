@@ -128,7 +128,15 @@ export default function Dashboard() {
 
   // Calculate sum of daily overtime
   const dailyExtra = (monthly?.records || []).reduce((sum, r) => sum + Math.max(0, (r.total_hours || 0) - 9), 0);
+  // Calculate sum of daily deficit (hours short on days worked < 9h)
+  const dailyDeficit = (monthly?.records || []).reduce((sum, r) => {
+    if (r.total_hours !== null && r.total_hours !== undefined && r.logout_time && r.total_hours < 9) {
+      return sum + (9 - r.total_hours);
+    }
+    return sum;
+  }, 0);
   const monthRemaining = s ? Math.max(0, s.totalRequiredHours - s.totalWorkedHours) : 0;
+  const overallDiff = s ? (s.totalWorkedHours - s.requiredTillToday) : 0;
 
   return (
     <div className="space-y-6 animate-in">
@@ -215,7 +223,7 @@ export default function Dashboard() {
 
       {/* Monthly Summary Cards */}
       {s && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           <SummaryCard
             icon={<Clock size={20} />}
             label="Worked"
@@ -236,6 +244,20 @@ export default function Dashboard() {
             value={hoursToHM(monthRemaining)}
             sub={`of ${s.totalRequiredHours}h monthly target`}
             color="amber"
+          />
+          <SummaryCard
+            icon={overallDiff >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+            label="Overall Diff"
+            value={(overallDiff > 0 ? '+' : overallDiff < 0 ? '-' : '') + hoursToHM(Math.abs(overallDiff))}
+            sub={`${overallDiff >= 0 ? 'Surplus' : 'Deficit'} till today`}
+            color={overallDiff >= 0 ? 'emerald' : 'red'}
+          />
+          <SummaryCard
+            icon={<AlertCircle size={20} />}
+            label="Less Worked"
+            value={hoursToHM(dailyDeficit)}
+            sub={`${s.daysWithDeficit} day${s.daysWithDeficit !== 1 ? 's' : ''} under 9h`}
+            color={dailyDeficit > 0 ? 'red' : 'emerald'}
           />
           <SummaryCard
             icon={<TrendingUp size={20} />}
