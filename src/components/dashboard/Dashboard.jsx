@@ -5,15 +5,16 @@ import { hoursToHM, statusColor, MONTHS } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import {
   LogIn, LogOut, Clock, CalendarDays, TrendingUp, TrendingDown,
-  AlertCircle, CheckCircle2, Timer, ChevronLeft, ChevronRight, Download,
-  Banknote, Pencil, X, Save
+  AlertCircle, CheckCircle2, Timer, ChevronLeft, ChevronRight, Download, Pencil, X, Check
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
 
+const WD_STORAGE_KEY = (year, month) => `ww_wd_${year}_${month}`;
+
 export default function Dashboard() {
-  const { user, updateProfile } = useAuth();
+  const { user } = useAuth();
   const [today, setToday] = useState(null);
   const [monthly, setMonthly] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,37 +25,24 @@ export default function Dashboard() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
-  const monthlySalary = user?.monthly_salary || 0;
-  const [showSalaryTutorial, setShowSalaryTutorial] = useState(false);
-  const [salaryInput, setSalaryInput] = useState('');
-  const [isSavingSalary, setIsSavingSalary] = useState(false);
+  // Working days override state
+  const [customWorkingDays, setCustomWorkingDays] = useState(null);
+  const [editingWD, setEditingWD] = useState(false);
+  const [wdInput, setWdInput] = useState('');
 
+  // Load override from localStorage when month/year changes
   useEffect(() => {
-    if (!loading && monthly?.summary && monthlySalary === 0) {
-      const timer = setTimeout(() => setShowSalaryTutorial(true), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, monthly, monthlySalary]);
-
-  const handleSaveSalary = async () => {
-    if (!salaryInput || isNaN(salaryInput)) return toast.error('Enter a valid amount');
-    setIsSavingSalary(true);
-    try {
-      await updateProfile({ monthly_salary: parseFloat(salaryInput) });
-      toast.success('Salary updated!');
-      setShowSalaryTutorial(false);
-    } catch (err) {
-      toast.error('Failed to update salary.');
-    } finally {
-      setIsSavingSalary(false);
-    }
-  };
+    const stored = localStorage.getItem(WD_STORAGE_KEY(year, month));
+    setCustomWorkingDays(stored ? parseInt(stored) : null);
+    setEditingWD(false);
+  }, [year, month]);
 
   const fetchData = useCallback(async () => {
     try {
+      const overrideParam = customWorkingDays !== null ? `&workingDaysOverride=${customWorkingDays}` : '';
       const [todayRes, monthlyRes] = await Promise.all([
         api.get('/attendance/today'),
-        api.get(`/attendance/monthly?year=${year}&month=${month}`)
+        api.get(`/attendance/monthly?year=${year}&month=${month}${overrideParam}`)
       ]);
       setToday(todayRes.data);
       setMonthly(monthlyRes.data);
@@ -63,7 +51,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, customWorkingDays]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -129,6 +117,30 @@ export default function Dashboard() {
     else setMonth(month + 1);
   };
 
+  const startEditWD = () => {
+    setWdInput(String(customWorkingDays ?? (monthly?.summary?.totalWorkingDays || '')));
+    setEditingWD(true);
+  };
+
+  const saveWD = () => {
+    const val = parseInt(wdInput);
+    if (!val || val < 1 || val > 31) {
+      toast.error('Enter a valid number of working days (1–31).');
+      return;
+    }
+    localStorage.setItem(WD_STORAGE_KEY(year, month), String(val));
+    setCustomWorkingDays(val);
+    setEditingWD(false);
+    toast.success(`Working days updated to ${val}`);
+  };
+
+  const resetWD = () => {
+    localStorage.removeItem(WD_STORAGE_KEY(year, month));
+    setCustomWorkingDays(null);
+    setEditingWD(false);
+    toast.success('Reset to default working days');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -142,7 +154,6 @@ export default function Dashboard() {
   const isPunchedIn = rec && rec.login_time && !rec.logout_time;
   const isPunchedOut = rec && rec.logout_time;
   const isWeekend = today?.isWeekend;
-  const currentHours = isPunchedIn ? liveHours : (rec?.total_hours || 0);
 
   // Chart data
   const chartData = (monthly?.records || []).map(r => ({
@@ -163,13 +174,9 @@ export default function Dashboard() {
     return sum;
   }, 0);
   const monthRemaining = s ? Math.max(0, s.totalRequiredHours - s.totalWorkedHours) : 0;
-  const overallDiff = s ? (s.totalWorkedHours - s.requiredTillToday) : 0;
 
-  // Salary Calculation
-  const hourlyRate = s && s.totalRequiredHours > 0 ? (monthlySalary / s.totalRequiredHours) : 0;
-  const earnedSalary = Math.round(s ? (s.totalWorkedHours * hourlyRate) : 0);
-  const formattedEarned = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(earnedSalary);
-  const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(monthlySalary);
+  const effectiveWorkingDays = s?.totalWorkingDays ?? 0;
+  const isOverridden = customWorkingDays !== null;
 
   return (
     <div className="space-y-6 animate-in">
@@ -184,15 +191,16 @@ export default function Dashboard() {
       </div>
 
       {/* Punch Card */}
-      <div className="card card-hover p-6">
+      <div className="card p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Timer size={20} className="text-brand-600" />
               Today's Status
-              {isWeekend && <span className="text-xs font-normal text-surface-300 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded-lg ml-2">Weekend</span>}
             </h2>
-            {isPunchedIn ? (
+            {isWeekend ? (
+              <p className="text-surface-300 mt-1">It's the weekend — enjoy your day off!</p>
+            ) : isPunchedIn ? (
               <div className="mt-2">
                 <p className="text-sm text-surface-300">Currently working</p>
                 <p className="text-4xl font-bold font-mono text-brand-600 mt-1">{hoursToHM(liveHours)}</p>
@@ -211,31 +219,31 @@ export default function Dashboard() {
                 <span className={`status-badge mt-2 ${statusColor(rec.status)}`}>{rec.status}</span>
               </div>
             ) : (
-              <p className="text-surface-300 mt-1">
-                {isWeekend ? "It's the weekend — but you can still log overtime!" : "You haven't punched in yet today."}
-              </p>
+              <p className="text-surface-300 mt-1">You haven't punched in yet today.</p>
             )}
           </div>
 
-          {/* Punch buttons — always available */}
-          <div className="flex gap-3 w-full sm:w-auto">
-            {!rec ? (
-              <button onClick={punchIn} disabled={punching} className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2">
-                <LogIn size={18} />
-                Punch In
-              </button>
-            ) : isPunchedIn ? (
-              <button onClick={punchOut} disabled={punching} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 py-3 transition-all">
-                <LogOut size={18} />
-                Punch Out
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 size={20} />
-                <span className="text-sm font-medium">Completed for today</span>
-              </div>
-            )}
-          </div>
+          {/* Punch buttons */}
+          {!isWeekend && (
+            <div className="flex gap-3 w-full sm:w-auto">
+              {!rec ? (
+                <button onClick={punchIn} disabled={punching} className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2">
+                  <LogIn size={18} />
+                  Punch In
+                </button>
+              ) : isPunchedIn ? (
+                <button onClick={punchOut} disabled={punching} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 py-3 transition-all">
+                  <LogOut size={18} />
+                  Punch Out
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 size={20} />
+                  <span className="text-sm font-medium">Completed for today</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -256,14 +264,7 @@ export default function Dashboard() {
 
       {/* Monthly Summary Cards */}
       {s && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          <SalaryCard
-            icon={<Banknote size={20} />}
-            label="Earned"
-            value={formattedEarned}
-            sub={`of ${formattedTotal} monthly`}
-            onEdit={() => { setSalaryInput(monthlySalary || ''); setShowSalaryTutorial(true); }}
-          />
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <SummaryCard
             icon={<Clock size={20} />}
             label="Worked"
@@ -271,13 +272,62 @@ export default function Dashboard() {
             sub={`of ${s.totalRequiredHours}h monthly target`}
             color="brand"
           />
-          <SummaryCard
-            icon={<CalendarDays size={20} />}
-            label="Present"
-            value={`${s.daysPresent} days`}
-            sub={`of ${s.totalWorkingDays} working days`}
-            color="emerald"
-          />
+
+          {/* Present card — editable working days */}
+          <div className="card p-4 sm:p-5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400`}>
+              <CalendarDays size={20} />
+            </div>
+            <p className="text-xs font-medium text-surface-300 uppercase tracking-wider">Present</p>
+            <p className="text-xl sm:text-2xl font-bold mt-0.5">{s.daysPresent} days</p>
+
+            {editingWD ? (
+              <div className="mt-1 flex items-center gap-1">
+                <span className="text-xs text-surface-300">of</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={wdInput}
+                  onChange={e => setWdInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveWD(); if (e.key === 'Escape') setEditingWD(false); }}
+                  className="w-12 text-xs font-semibold border border-brand-400 rounded px-1 py-0.5 bg-transparent text-center focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  autoFocus
+                />
+                <span className="text-xs text-surface-300">days</span>
+                <button onClick={saveWD} className="text-emerald-600 hover:text-emerald-700 ml-0.5" title="Save">
+                  <Check size={13} />
+                </button>
+                <button onClick={() => setEditingWD(false)} className="text-surface-300 hover:text-red-500" title="Cancel">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 mt-0.5">
+                <p className="text-xs text-surface-300">
+                  of {effectiveWorkingDays} working days
+                  {isOverridden && <span className="ml-1 text-amber-500">*</span>}
+                </p>
+                <button
+                  onClick={startEditWD}
+                  className="text-surface-400 hover:text-brand-600 transition-colors ml-1"
+                  title="Edit working days"
+                >
+                  <Pencil size={11} />
+                </button>
+                {isOverridden && (
+                  <button
+                    onClick={resetWD}
+                    className="text-amber-500 hover:text-red-500 transition-colors"
+                    title="Reset to default"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <SummaryCard
             icon={<TrendingDown size={20} />}
             label="Remaining"
@@ -286,18 +336,25 @@ export default function Dashboard() {
             color="amber"
           />
           <SummaryCard
-            icon={overallDiff >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-            label="Time Balance"
-            value={(overallDiff > 0 ? '+' : overallDiff < 0 ? '-' : '') + hoursToHM(Math.abs(overallDiff))}
-            sub={`${overallDiff >= 0 ? 'Ahead of schedule' : 'Behind schedule'}`}
-            color={overallDiff >= 0 ? 'emerald' : 'red'}
+            icon={<AlertCircle size={20} />}
+            label="Less Worked"
+            value={hoursToHM(dailyDeficit)}
+            sub={`${s.daysWithDeficit} day${s.daysWithDeficit !== 1 ? 's' : ''} under 9h`}
+            color={dailyDeficit > 0 ? 'red' : 'emerald'}
+          />
+          <SummaryCard
+            icon={<TrendingUp size={20} />}
+            label="Extra"
+            value={hoursToHM(dailyExtra)}
+            sub="daily overtime total"
+            color={dailyExtra > 0 ? 'emerald' : 'red'}
           />
         </div>
       )}
 
       {/* Progress Bar */}
       {s && (
-        <div className="card card-hover p-5 group">
+        <div className="card p-5">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-surface-300">Monthly Progress</span>
             <span className="text-sm font-bold">{progressPct}%</span>
@@ -319,7 +376,7 @@ export default function Dashboard() {
 
       {/* Daily Hours Chart */}
       {chartData.length > 0 && (
-        <div className="card card-hover p-5">
+        <div className="card p-5">
           <h3 className="text-sm font-bold mb-4 text-surface-300 uppercase tracking-wider">Daily Hours</h3>
           <div className="h-48 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -355,57 +412,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Salary Tutorial Modal */}
-      {showSalaryTutorial && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => monthlySalary > 0 && setShowSalaryTutorial(false)}>
-          <div className="card p-6 w-full max-w-md animate-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <Banknote size={20} className="text-emerald-600" /> 
-                {monthlySalary === 0 ? 'Salary Setup' : 'Update Salary'}
-              </h3>
-              {monthlySalary > 0 && (
-                <button onClick={() => setShowSalaryTutorial(false)} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
-                  <X size={18} />
-                </button>
-              )}
-            </div>
-            
-            {monthlySalary === 0 && (
-              <div className="bg-brand-50 dark:bg-brand-900/30 p-4 rounded-xl mb-5">
-                <p className="text-sm text-brand-700 dark:text-brand-300">
-                  <strong>Welcome to Earnings Tracking!</strong><br/><br/>
-                  Enter your fixed monthly salary below. We'll automatically calculate your exact earned amount in real-time as your work hours tick up. 
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-surface-300 mb-1">Monthly Salary (INR)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3 text-surface-400">₹</span>
-                  <input
-                    type="number"
-                    className="input-field text-sm pl-8"
-                    placeholder="e.g. 39000"
-                    value={salaryInput}
-                    onChange={e => setSalaryInput(e.target.value)}
-                  />
-                </div>
-              </div>
-              <button 
-                onClick={handleSaveSalary} 
-                disabled={isSavingSalary}
-                className="btn-primary w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 focus:ring-emerald-500 hover:shadow-emerald-500/25"
-              >
-                <Save size={16} /> {isSavingSalary ? 'Saving...' : 'Save & Calculate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -419,32 +425,12 @@ function SummaryCard({ icon, label, value, sub, color }) {
   };
 
   return (
-    <div className="card card-hover p-4 sm:p-5">
+    <div className="card p-4 sm:p-5">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color]}`}>
         {icon}
       </div>
       <p className="text-xs font-medium text-surface-300 uppercase tracking-wider">{label}</p>
       <p className="text-xl sm:text-2xl font-bold mt-0.5">{value}</p>
-      <p className="text-xs text-surface-300 mt-0.5">{sub}</p>
-    </div>
-  );
-}
-
-function SalaryCard({ icon, label, value, sub, onEdit }) {
-  return (
-    <div className="card card-hover p-4 sm:p-5 relative group border-emerald-200 dark:border-emerald-900/50">
-      <button 
-        onClick={onEdit} 
-        className="absolute top-3 right-3 p-1.5 rounded-lg text-surface-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 opacity-0 group-hover:opacity-100 transition-all"
-        title="Edit Salary"
-      >
-        <Pencil size={14} />
-      </button>
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
-        {icon}
-      </div>
-      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{label}</p>
-      <p className="text-xl sm:text-2xl font-bold mt-0.5 text-emerald-700 dark:text-emerald-300">{value}</p>
       <p className="text-xs text-surface-300 mt-0.5">{sub}</p>
     </div>
   );
