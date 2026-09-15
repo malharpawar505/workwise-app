@@ -5,14 +5,25 @@ import { hoursToHM, statusColor, MONTHS } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import {
   LogIn, LogOut, Clock, CalendarDays, TrendingUp, TrendingDown,
-  AlertCircle, CheckCircle2, Timer, ChevronLeft, ChevronRight, Download,
-  Banknote, Pencil, X, Save, Check
+  CheckCircle2, Timer, ChevronLeft, ChevronRight, Download,
+  Banknote, Pencil, X, Save, Check, RotateCcw
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
 
-const WD_STORAGE_KEY = (year, month) => `ww_wd_${year}_${month}`;
+const REQUIRED_HOURS_PER_DAY = 9;
+const wdKey = (year, month) => `ww_wd_${year}_${month}`;
+
+function readWD(year, month) {
+  try {
+    const stored = localStorage.getItem(wdKey(year, month));
+    const parsed = stored ? parseInt(stored) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Dashboard() {
   const { user, updateProfile } = useAuth();
@@ -32,8 +43,10 @@ export default function Dashboard() {
   const [salaryInput, setSalaryInput] = useState('');
   const [isSavingSalary, setIsSavingSalary] = useState(false);
 
-  // Working days override
-  const [customWorkingDays, setCustomWorkingDays] = useState(null);
+  // Working days override — seeded synchronously so a remount never flashes the default
+  const [customWorkingDays, setCustomWorkingDays] = useState(
+    () => readWD(now.getFullYear(), now.getMonth() + 1)
+  );
   const [editingWD, setEditingWD] = useState(false);
   const [wdInput, setWdInput] = useState('');
 
@@ -44,19 +57,17 @@ export default function Dashboard() {
     }
   }, [loading, monthly, monthlySalary]);
 
-  // Load working days override from localStorage when month/year changes
+  // Re-read the override whenever the viewed month changes
   useEffect(() => {
-    const stored = localStorage.getItem(WD_STORAGE_KEY(year, month));
-    setCustomWorkingDays(stored ? parseInt(stored) : null);
+    setCustomWorkingDays(readWD(year, month));
     setEditingWD(false);
   }, [year, month]);
 
   const fetchData = useCallback(async () => {
     try {
-      const overrideParam = customWorkingDays !== null ? `&workingDaysOverride=${customWorkingDays}` : '';
       const [todayRes, monthlyRes] = await Promise.all([
         api.get('/attendance/today'),
-        api.get(`/attendance/monthly?year=${year}&month=${month}${overrideParam}`)
+        api.get(`/attendance/monthly?year=${year}&month=${month}`)
       ]);
       setToday(todayRes.data);
       setMonthly(monthlyRes.data);
@@ -65,7 +76,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [year, month, customWorkingDays]);
+  }, [year, month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -146,27 +157,27 @@ export default function Dashboard() {
   };
 
   const startEditWD = () => {
-    setWdInput(String(customWorkingDays ?? (monthly?.summary?.totalWorkingDays || '')));
+    setWdInput(String(customWorkingDays ?? monthly?.summary?.totalWorkingDays ?? ''));
     setEditingWD(true);
   };
 
   const saveWD = () => {
     const val = parseInt(wdInput);
-    if (!val || val < 1 || val > 31) {
-      toast.error('Enter a valid number (1–31).');
+    if (!Number.isInteger(val) || val < 1 || val > 31) {
+      toast.error('Enter a number between 1 and 31.');
       return;
     }
-    localStorage.setItem(WD_STORAGE_KEY(year, month), String(val));
+    try { localStorage.setItem(wdKey(year, month), String(val)); } catch { /* storage unavailable */ }
     setCustomWorkingDays(val);
     setEditingWD(false);
-    toast.success(`Working days updated to ${val}`);
+    toast.success(`Working days set to ${val}`);
   };
 
   const resetWD = () => {
-    localStorage.removeItem(WD_STORAGE_KEY(year, month));
+    try { localStorage.removeItem(wdKey(year, month)); } catch { /* storage unavailable */ }
     setCustomWorkingDays(null);
     setEditingWD(false);
-    toast.success('Reset to default working days');
+    toast.success('Reset to calendar default');
   };
 
   if (loading) {
@@ -189,18 +200,23 @@ export default function Dashboard() {
     status: r.status
   }));
 
-  const progressPct = s ? Math.min(100, Math.round((s.totalWorkedHours / Math.max(1, s.totalRequiredHours)) * 100)) : 0;
-  const monthRemaining = s ? Math.max(0, s.totalRequiredHours - s.totalWorkedHours) : 0;
-  const overallDiff = s ? (s.totalWorkedHours - s.requiredTillToday) : 0;
-
-  // Salary calculation
-  const hourlyRate = s && s.totalRequiredHours > 0 ? (monthlySalary / s.totalRequiredHours) : 0;
-  const earnedSalary = Math.round(s ? (s.totalWorkedHours * hourlyRate) : 0);
-  const formattedEarned = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(earnedSalary);
-  const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(monthlySalary);
-
-  const effectiveWorkingDays = s?.totalWorkingDays ?? 0;
+  // Working days + monthly target derive from the override, so the numbers update
+  // the moment it changes — no server round trip.
   const isOverridden = customWorkingDays !== null;
+  const effectiveWorkingDays = customWorkingDays ?? s?.totalWorkingDays ?? 0;
+  const effectiveRequiredHours = effectiveWorkingDays * REQUIRED_HOURS_PER_DAY;
+
+  const workedHours = s?.totalWorkedHours ?? 0;
+  const monthRemaining = Math.max(0, effectiveRequiredHours - workedHours);
+  const progressPct = effectiveRequiredHours > 0
+    ? Math.min(100, Math.round((workedHours / effectiveRequiredHours) * 100))
+    : 0;
+  const overallDiff = s ? (workedHours - s.requiredTillToday) : 0;
+
+  // Salary — same monthly pay spread across the effective target hours
+  const hourlyRate = effectiveRequiredHours > 0 ? (monthlySalary / effectiveRequiredHours) : 0;
+  const earnedSalary = Math.round(workedHours * hourlyRate);
+  const inr = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 
   return (
     <div className="space-y-6 animate-in">
@@ -291,8 +307,8 @@ export default function Dashboard() {
           <SalaryCard
             icon={<Banknote size={20} />}
             label="Earned"
-            value={formattedEarned}
-            sub={`of ${formattedTotal} monthly`}
+            value={inr(earnedSalary)}
+            sub={`of ${inr(monthlySalary)} monthly`}
             onEdit={() => { setSalaryInput(monthlySalary || ''); setShowSalaryTutorial(true); }}
           />
 
@@ -300,13 +316,24 @@ export default function Dashboard() {
           <SummaryCard
             icon={<Clock size={20} />}
             label="Worked"
-            value={hoursToHM(s.totalWorkedHours)}
-            sub={`of ${s.totalRequiredHours}h monthly target`}
+            value={hoursToHM(workedHours)}
+            sub={`of ${effectiveRequiredHours}h monthly target`}
             color="brand"
           />
 
           {/* Present — editable working days */}
-          <div className="card card-hover p-4 sm:p-5">
+          <div className="card card-hover p-4 sm:p-5 relative">
+            {!editingWD && (
+              <button
+                onClick={startEditWD}
+                className="absolute top-3 right-3 w-9 h-9 rounded-xl flex items-center justify-center bg-surface-100 dark:bg-surface-800 text-surface-400 hover:bg-brand-600 hover:text-white dark:hover:bg-brand-600 transition-all"
+                title="Edit working days"
+                aria-label="Edit working days"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
               <CalendarDays size={20} />
             </div>
@@ -314,43 +341,56 @@ export default function Dashboard() {
             <p className="text-xl sm:text-2xl font-bold mt-0.5">{s.daysPresent} days</p>
 
             {editingWD ? (
-              <div className="mt-1 flex items-center gap-1">
-                <span className="text-xs text-surface-300">of</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={wdInput}
-                  onChange={e => setWdInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveWD(); if (e.key === 'Escape') setEditingWD(false); }}
-                  className="w-12 text-xs font-semibold border border-brand-400 rounded px-1 py-0.5 bg-transparent text-center focus:outline-none focus:ring-1 focus:ring-brand-400"
-                  autoFocus
-                />
-                <span className="text-xs text-surface-300">days</span>
-                <button onClick={saveWD} className="text-emerald-600 hover:text-emerald-700 ml-0.5" title="Save">
-                  <Check size={13} />
-                </button>
-                <button onClick={() => setEditingWD(false)} className="text-surface-300 hover:text-red-500" title="Cancel">
-                  <X size={13} />
-                </button>
+              <div className="mt-2">
+                <label className="block text-[10px] uppercase tracking-wider text-surface-300 mb-1">
+                  Working days
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={wdInput}
+                    onChange={e => setWdInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') saveWD();
+                      if (e.key === 'Escape') setEditingWD(false);
+                    }}
+                    className="w-16 text-sm font-bold text-center rounded-lg px-2 py-1.5 bg-transparent border-2 border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                    autoFocus
+                  />
+                  <button
+                    onClick={saveWD}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+                    title="Save"
+                  >
+                    <Check size={15} />
+                  </button>
+                  <button
+                    onClick={() => setEditingWD(false)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-200 dark:bg-surface-700 text-surface-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
+                    title="Cancel"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                {isOverridden && (
+                  <button
+                    onClick={resetWD}
+                    className="mt-2 flex items-center gap-1 text-[11px] text-surface-400 hover:text-brand-600 transition-colors"
+                  >
+                    <RotateCcw size={11} />
+                    Reset to calendar default
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="flex items-center gap-1 mt-0.5">
-                <p className="text-xs text-surface-300">
-                  of {effectiveWorkingDays} working days
-                  {isOverridden && <span className="ml-1 text-amber-500">*</span>}
-                </p>
-                <button
-                  onClick={startEditWD}
-                  className="text-surface-400 hover:text-brand-600 transition-colors ml-1"
-                  title="Edit working days"
-                >
-                  <Pencil size={11} />
-                </button>
+              <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                <p className="text-xs text-surface-300">of {effectiveWorkingDays} working days</p>
                 {isOverridden && (
-                  <button onClick={resetWD} className="text-amber-500 hover:text-red-500 transition-colors" title="Reset to default">
-                    <X size={11} />
-                  </button>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                    Custom
+                  </span>
                 )}
               </div>
             )}
@@ -361,7 +401,7 @@ export default function Dashboard() {
             icon={<TrendingDown size={20} />}
             label="Remaining"
             value={hoursToHM(monthRemaining)}
-            sub={`of ${s.totalRequiredHours}h monthly target`}
+            sub={`of ${effectiveRequiredHours}h monthly target`}
             color="amber"
           />
 
@@ -392,8 +432,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex justify-between text-xs text-surface-300 mt-1">
-            <span>{hoursToHM(s.totalWorkedHours)}</span>
-            <span>{s.totalRequiredHours}h monthly target</span>
+            <span>{hoursToHM(workedHours)}</span>
+            <span>{effectiveRequiredHours}h monthly target</span>
           </div>
         </div>
       )}
@@ -513,13 +553,14 @@ function SummaryCard({ icon, label, value, sub, color }) {
 
 function SalaryCard({ icon, label, value, sub, onEdit }) {
   return (
-    <div className="card card-hover p-4 sm:p-5 relative group border-emerald-200 dark:border-emerald-900/50">
+    <div className="card card-hover p-4 sm:p-5 relative border-emerald-200 dark:border-emerald-900/50">
       <button
         onClick={onEdit}
-        className="absolute top-3 right-3 p-1.5 rounded-lg text-surface-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 opacity-0 group-hover:opacity-100 transition-all"
-        title="Edit Salary"
+        className="absolute top-3 right-3 w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all"
+        title="Edit salary"
+        aria-label="Edit salary"
       >
-        <Pencil size={14} />
+        <Pencil size={16} />
       </button>
       <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
         {icon}
